@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f2ea">
+  <title>漫剧发布工作台 · 文案与配图</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+  <script src="/publish.js" type="module"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="漫剧发布工作台首页">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <span>漫剧<span class="brand-light">发布工作台</span></span>
+      </a>
+      <div class="topbar-right">
+        <button id="publishing-open" class="publishing-nav" type="button" disabled>发布素材 ↗</button>
+        <span class="topbar-label">BAIDU × QUARK</span>
+        <span class="live-dot" aria-hidden="true"></span>
+        <span id="connection-label">检查搜索方式中</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="eyebrow-line"></span> RESOURCE FINDER / BAIDU × QUARK</p>
+          <h1 id="page-title">找到资源，<br><em>写成一篇好帖子。</em></h1>
+          <p class="hero-description">搜索百度与夸克公开资源，整理真实的作品信息，生成贴吧文案、发布封面和目录图。</p>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="orbit orbit-one"></div>
+          <div class="orbit orbit-two"></div>
+          <div class="radar-core"><span></span></div>
+          <div class="radar-sweep"></div>
+          <span class="art-coordinate coordinate-one">31° 15′ N</span>
+          <span class="art-coordinate coordinate-two">SEARCH / LIVE</span>
+        </div>
+      </section>
+
+      <section class="hot-section" aria-labelledby="hot-title">
+        <div class="section-heading hot-heading">
+          <div>
+            <p class="section-kicker">TRENDING / 最近收录</p>
+            <h2 id="hot-title">近期热门内容</h2>
+            <p class="hot-intro">最近 31 天收录的漫剧作品与更新合集，按来源热度排序。</p>
+          </div>
+          <button id="hot-refresh" type="button">刷新榜单 <span aria-hidden="true">↻</span></button>
+        </div>
+        <p id="hot-status" role="status" aria-live="polite">正在更新热门内容…</p>
+        <div id="hot-results" class="hot-grid"></div>
+      </section>
+
+      <section class="search-panel" aria-label="搜索条件">
+        <form id="search-form">
+          <label class="field-label" for="keyword">搜索关键词 <span>KEYWORD</span></label>
+          <div class="search-row">
+            <div class="search-input-wrap">
+              <span class="search-icon" aria-hidden="true"></span>
+              <input id="keyword" name="keyword" type="search" maxlength="60" autocomplete="off" placeholder="输入任意关键词，例如：摄影教程、Python、电子书" required>
+              <kbd>↵</kbd>
+            </div>
+            <button class="search-button" type="submit"><span>开始搜索</span><span aria-hidden="true">↗</span></button>
+          </div>
+          <div class="filters">
+            <div class="filter-group" aria-label="资源类型">
+              <span class="filter-title">查找</span>
+              <label class="filter-chip"><input type="radio" name="kind" value="all" checked><span>不限内容</span></label>
+              <label class="filter-chip"><input type="radio" name="kind" value="works"><span>漫剧作品</span></label>
+              <label class="filter-chip"><input type="radio" name="kind" value="making"><span>教程素材</span></label>
+            </div>
+            <label class="freshness-label" for="freshness">时间范围
+              <select id="freshness" name="freshness">
+                <option value="all">不限时间</option>
+                <option value="pd">最近 24 小时</option>
+                <option value="pw">最近 7 天</option>
+                <option value="pm">最近 31 天</option>
+              </select>
+            </label>
+          </div>
+        </form>
+        <div class="quick-search">
+          <span>试试搜索</span>
+          <button type="button" data-example="AI漫剧" data-kind="works">AI漫剧</button>
+          <button type="button" data-example="摄影教程">摄影教程</button>
+          <button type="button" data-example="Python">Python</button>
+          <button type="button" data-example="电子书">电子书</button>
+        </div>
+      </section>
+
+      <section id="baidu-login-section" class="drive-section baidu-drive-section" aria-labelledby="baidu-drive-title">
+        <div class="drive-copy">
+          <p class="section-kicker">SAVE / 百度网盘</p>
+          <h2 id="baidu-drive-title">登录后，保存到网盘根目录</h2>
+          <p>打开工具专用的百度登录窗口，在百度官方页面扫码或登录自己的账号。完成后回到这里，点击资源的“一键转存”，默认保存到网盘根目录。</p>
+          <p class="drive-privacy">需要本机已有 Edge 或 Chrome。登录状态保存在工具专用的本地浏览器目录；网页转存依赖百度非公开接口，平台更新或验证码可能影响使用。</p>
+        </div>
+        <div class="drive-action">
+          <div class="drive-state"><span id="baidu-state-dot" class="drive-state-dot"></span><strong id="baidu-auth-label">检查百度登录状态…</strong></div>
+          <button id="baidu-auth-button" class="drive-primary-button" type="button">打开百度登录窗口 <span aria-hidden="true">↗</span></button>
+          <p id="baidu-auth-message" role="status" aria-live="polite">只在百度官方页面输入登录信息。</p>
+        </div>
+      </section>
+
+      <section id="quark-login-section" class="drive-section" aria-labelledby="drive-title">
+        <div class="drive-copy">
+          <p class="section-kicker">SAVE / 夸克网盘</p>
+          <h2 id="drive-title">扫码后，一键转存</h2>
+          <p>用夸克 App 扫码登录本机工具。搜索结果中的夸克分享默认保存到您的网盘根目录。</p>
+          <p class="drive-privacy">登录凭据保存在这台电脑的本地目录。发行包内含第三方 QuarkPan 组件，依赖夸克的非公开接口，平台更新后可能失效。</p>
+        </div>
+        <div class="drive-action">
+          <div class="drive-state"><span class="drive-state-dot"></span><strong id="quark-auth-label">检查夸克登录状态…</strong></div>
+          <button id="quark-login-button" type="button">扫码登录夸克网盘 <span aria-hidden="true">↗</span></button>
+          <div id="quark-qr-wrap" class="qr-wrap" hidden>
+            <img id="quark-qr" alt="使用夸克 App 扫描此二维码登录">
+            <p>请用夸克 App 扫码，二维码约 5 分钟后过期。</p>
+          </div>
+          <p id="quark-auth-message" role="status" aria-live="polite">无需输入网盘密码。</p>
+        </div>
+      </section>
+
+      <section class="results-section" aria-labelledby="results-title">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">DISCOVERY / 双平台检索</p>
+            <h2 id="results-title">搜索结果</h2>
+          </div>
+          <p id="search-status" role="status" aria-live="polite">输入关键词后开始搜索</p>
+        </div>
+        <div id="mode-note" class="mode-note" hidden></div>
+        <div class="results-grid">
+          <section class="platform-column" aria-labelledby="baidu-title">
+            <div class="platform-heading">
+              <span class="platform-number">01</span>
+              <div><p>BAIDU NETDISK</p><h3 id="baidu-title">百度网盘 <span id="baidu-count" class="result-count">0</span></h3></div>
+              <a id="baidu-external" class="external-search" href="#" target="_blank" rel="noopener noreferrer" hidden>网页搜索 ↗</a>
+            </div>
+            <div id="baidu-engines" class="engine-links" hidden></div>
+            <div id="baidu-results" class="result-list"><div class="empty-state"><span class="empty-symbol">⌕</span><strong>等待搜索</strong><p>百度网盘的公开分享线索会显示在这里。</p></div></div>
+          </section>
+          <section class="platform-column" aria-labelledby="quark-title">
+            <div class="platform-heading">
+              <span class="platform-number">02</span>
+              <div><p>QUARK DRIVE</p><h3 id="quark-title">夸克网盘 <span id="quark-count" class="result-count">0</span></h3></div>
+              <a id="quark-external" class="external-search" href="#" target="_blank" rel="noopener noreferrer" hidden>网页搜索 ↗</a>
+            </div>
+            <div id="quark-engines" class="engine-links" hidden></div>
+            <div id="quark-results" class="result-list"><div class="empty-state"><span class="empty-symbol">⌕</span><strong>等待搜索</strong><p>夸克网盘的公开分享线索会显示在这里。</p></div></div>
+          </section>
+        </div>
+        <button id="load-more" class="load-more" type="button" hidden>加载更多索引结果</button>
+      </section>
+
+      <section id="publishing-section" class="publishing-section" aria-labelledby="publishing-title">
+        <div class="publishing-heading">
+          <div><p class="section-kicker">STUDIO / 发布素材</p><h2 id="publishing-title">把资源整理成一篇好帖子。</h2><p>确认作品信息，生成可编辑文案和配图。也可以在搜索结果中点击“制作发布素材”。</p></div>
+          <span class="publishing-badge">本地模板 · 无需密钥</span>
+        </div>
+        <div class="publishing-layout">
+          <div class="publishing-inputs">
+            <div id="publishing-reference" class="publishing-reference" hidden><strong>搜索参考 · 请核对作品信息</strong><p id="publishing-reference-title"></p><p id="publishing-reference-description"></p><a id="publishing-reference-link" target="_blank" rel="noopener noreferrer">打开参考资源 ↗</a></div>
+            <form id="publishing-form">
+              <div class="publishing-step"><span>01</span><h3>填写真实的资源信息</h3></div>
+              <label for="publishing-work-title">作品 / 资源名称 <span>必填</span></label>
+              <input id="publishing-work-title" name="title" maxlength="80" required placeholder="例如：你的漫剧作品名称">
+              <div class="publishing-field-pair">
+                <div><label for="publishing-mode">内容方向</label><select id="publishing-mode" name="mode"><option value="works">作品资源分享</option><option value="making">制作教程分享</option></select></div>
+                <div><label for="publishing-genre">题材 / 主题</label><input id="publishing-genre" name="genre" maxlength="40" placeholder="例如：科幻、古风、角色一致性"></div>
+              </div>
+              <label for="publishing-synopsis">作品介绍 / 分享内容</label>
+              <textarea id="publishing-synopsis" name="synopsis" rows="4" maxlength="1000" placeholder="写你确认过的剧情、看点或教程内容。介绍和目录至少填写一项。"></textarea>
+              <div class="publishing-field-pair">
+                <div><label for="publishing-episodes">更新集数 / 版本</label><input id="publishing-episodes" name="episodes" maxlength="60" placeholder="例如：第1—8集；不要猜测集数"></div>
+                <div><label for="publishing-completion">更新状态</label><select id="publishing-completion" name="completion"><option value="unknown">尚未确认</option><option value="ongoing">持续更新</option><option value="complete">已完结</option></select></div>
+              </div>
+              <label for="publishing-resources">实际文件目录 <span>每行一项</span></label>
+              <textarea id="publishing-resources" name="resources" rows="3" maxlength="1200" placeholder="第01集.mp4&#10;第02集.mp4&#10;作品介绍.txt"></textarea>
+              <div class="publishing-step"><span>02</span><h3>填入自己的领取链接</h3></div>
+              <label for="publishing-share-url">自己的网盘分享链接 <span>可先留空做草稿</span></label>
+              <input id="publishing-share-url" name="ownShareUrl" type="url" maxlength="500" placeholder="https://pan.baidu.com/s/…">
+              <div class="publishing-field-pair">
+                <div><label for="publishing-access-code">自己的提取码</label><input id="publishing-access-code" name="ownAccessCode" maxlength="4" pattern="[A-Za-z0-9]{4}" placeholder="4位字母或数字"></div>
+                <div><label for="publishing-target-bar">目标贴吧</label><input id="publishing-target-bar" name="targetBar" maxlength="40" value="AI漫剧吧"></div>
+              </div>
+              <p class="publishing-hint">转存后请在自己的网盘创建分享，再把链接填在这里。拉新归因以你参与的活动规则为准。</p>
+              <label for="publishing-tone">文案风格</label>
+              <select id="publishing-tone" name="tone"><option value="clear">清晰介绍</option><option value="friendly">轻松推荐</option><option value="update">更新公告</option></select>
+              <button class="publishing-primary" id="publishing-generate" type="submit" disabled>生成文案与配图 <span aria-hidden="true">↗</span></button>
+            </form>
+            <div class="publishing-draft-actions"><button id="publishing-save" type="button" disabled>保存本机草稿</button><button id="publishing-load" type="button" disabled>恢复上次草稿</button></div>
+            <p id="publishing-status" role="status" aria-live="polite">文案由本地模板整理，配图由本机排版生成。</p>
+          </div>
+          <div class="publishing-output">
+            <div id="publishing-empty" class="publishing-empty"><span class="publishing-empty-mark" aria-hidden="true">Aa ↗</span><h3>一份资源，一组发布素材。</h3><p>3 个标题备选 · 贴吧正文<br>封面图 · 目录图 · AI 创作提示词</p><p>先填写左侧资料，再生成预览。</p></div>
+            <div id="publishing-pack" hidden>
+              <div class="publishing-step"><span>03</span><h3>预览与修改</h3><span class="publishing-editable">可编辑</span></div>
+              <p id="publishing-warnings" class="publishing-warnings" role="status" hidden></p>
+              <p id="publishing-stale" class="publishing-warnings" hidden>资料已更改，请重新生成，让文案和图片保持一致。重新生成会替换当前文案。</p>
+              <div id="publishing-titles" class="publishing-titles" aria-label="标题备选"></div>
+              <label for="publishing-output-title">发布标题</label><input id="publishing-output-title" maxlength="160">
+              <label for="publishing-output-body">贴吧正文</label><textarea id="publishing-output-body" rows="12" maxlength="12000"></textarea>
+              <div class="publishing-actions"><button id="publishing-copy" type="button" data-pack-action>复制标题与正文</button><button id="publishing-download-text" type="button" data-pack-action>下载文案 .txt</button><button id="publishing-download-pack" type="button" data-pack-action>导出素材清单 .json</button></div>
+              <div class="publishing-image-controls">
+                <div><label for="publishing-theme">配图色系</label><select id="publishing-theme"><option value="forest">森林绿</option><option value="ink">深夜蓝</option><option value="paper">暖纸色</option></select></div>
+                <div><label for="publishing-artwork">上传自己的封面 / 剧照</label><input id="publishing-artwork" type="file" accept="image/png,image/jpeg,image/webp"><button id="publishing-clear-artwork" type="button" hidden>移除图片</button></div>
+              </div>
+              <p id="publishing-image-status" class="publishing-hint" role="status">默认使用抽象图形排版。上传图片仅在本机使用。</p>
+              <div class="publishing-images">
+                <figure><canvas id="publishing-cover" width="1200" height="900" role="img" aria-label="发布封面图预览"></canvas><figcaption><span>封面 · 1200 × 900</span><button id="publishing-download-cover" type="button" data-pack-action>下载 PNG ↗</button></figcaption></figure>
+                <figure><canvas id="publishing-directory" width="1200" height="900" role="img" aria-label="资源目录图预览"></canvas><figcaption><span>目录 · 1200 × 900</span><button id="publishing-download-directory" type="button" data-pack-action>下载 PNG ↗</button></figcaption></figure>
+              </div>
+              <details class="publishing-ai-prompts"><summary>继续用 AI 改写或绘图</summary><p>复制提示词到你使用的 AI 服务。这里不会调用模型；生成插画时请注明“概念配图”。</p><label for="publishing-text-prompt">文案提示词</label><textarea id="publishing-text-prompt" rows="5" readonly></textarea><button id="publishing-copy-text-prompt" type="button" data-pack-action>复制文案提示词</button><label for="publishing-image-prompt">配图提示词</label><textarea id="publishing-image-prompt" rows="4" readonly></textarea><button id="publishing-copy-image-prompt" type="button" data-pack-action>复制配图提示词</button></details>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section" aria-labelledby="settings-title">
+        <div><p class="section-kicker">SETUP / 可选设置</p><h2 id="settings-title">扩展公开网页搜索</h2><p>默认同时查询盘搜索索引和 PanSou 聚合来源。可以添加七牛云百度搜索或 Brave Search，自动合并网页结果。每个已配置 API 的双平台搜索使用 2 次请求，测试连接使用 1 次；加载更多索引不重复调用。密钥仅保存在本机。</p></div>
+        <details id="settings-details">
+          <summary>设置搜索密钥 <span aria-hidden="true">↗</span></summary>
+          <form id="qiniu-settings-form" class="provider-form">
+            <h3>七牛云 · 百度搜索</h3>
+            <p id="qiniu-config-label">尚未配置七牛搜索</p>
+            <label for="qiniu-api-key">七牛云 AI API Key</label>
+            <div class="settings-row"><input id="qiniu-api-key" name="qiniu-api-key" type="password" autocomplete="off" placeholder="粘贴自己的 AI API Key"><button type="submit">保存密钥</button></div>
+            <div class="provider-actions"><button id="qiniu-test" type="button" disabled>测试连接（1 次请求）</button><button id="qiniu-clear" type="button" disabled>清除本机密钥</button></div>
+            <p><a href="https://s.qiniu.com/RbuYve" target="_blank" rel="noopener noreferrer">通过作者邀请注册七牛云 ↗</a> · <a href="https://developer.qiniu.com/aitokenapi/12884/how-to-get-api-key" target="_blank" rel="noopener noreferrer">获取 AI 密钥 ↗</a> · <a href="https://developer.qiniu.com/aitokenapi/13192/web-search-api" target="_blank" rel="noopener noreferrer">搜索接口说明 ↗</a></p>
+            <p>邀请活动奖励为模型 Token，能否抵扣搜索费用请在七牛控制台核对资源包范围。</p>
+            <p id="qiniu-settings-status" role="status" aria-live="polite"></p>
+          </form>
+          <form id="settings-form" class="provider-form">
+            <h3>Brave Search</h3>
+            <p id="brave-config-label">尚未配置 Brave 搜索</p>
+            <label for="api-key">Brave Search API 密钥</label>
+            <div class="settings-row"><input id="api-key" name="api-key" type="password" autocomplete="off" placeholder="粘贴密钥"><button type="submit">保存密钥</button></div>
+            <div class="provider-actions"><button id="brave-test" type="button" disabled>测试连接（1 次请求）</button><button id="brave-clear" type="button" disabled>清除本机密钥</button></div>
+            <p>获取密钥：<a href="https://brave.com/search/api/" target="_blank" rel="noopener noreferrer">Brave Search API ↗</a></p>
+            <p id="settings-status" role="status" aria-live="polite"></p>
+          </form>
+        </details>
+      </section>
+    </main>
+
+    <footer><span>漫剧发布工作台 / 本机搜索工具</span><p>结果来自公开索引；搜索时间不代表网盘链接仍然有效。请确认资源来源和使用授权。</p><a href="https://www.pansousuo.com/api-docs" target="_blank" rel="noopener noreferrer">公开索引：盘搜索 ↗</a></footer>
+  </div>
+</body>
+</html>

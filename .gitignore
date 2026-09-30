@@ -1,0 +1,13 @@
+config.local.json
+.cache/
+.venv/
+.venv312/
+node_modules/
+build/
+dist/
+__pycache__/
+ManjuPublishStudio/
+.env
+.env.*
+*.log
+docs/plans/
