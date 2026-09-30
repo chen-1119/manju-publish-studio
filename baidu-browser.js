@@ -4,6 +4,23 @@ import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { transferToBaiduRoot, waitForBaiduTransfer, createBaiduShare, BaiduUserError } from './baidu-web.js';
 
+function browserLaunchError(error) {
+  if (error instanceof BaiduUserError) return error;
+  const detail = String(error?.message || '');
+  if (/ProcessSingleton|Singleton(?:Lock|Cookie)|profile[^\n]*(?:in use|locked)|user data directory[^\n]*(?:in use|locked)|already running/i.test(detail)) {
+    return new BaiduUserError('百度登录资料正被另一个工具窗口占用。请关闭此前打开的漫剧工具和它的百度登录窗口，再重新尝试。');
+  }
+  if (error?.code === 'MODULE_NOT_FOUND' || /Cannot find module|playwright[^\n]*(?:missing|not found)/i.test(detail)) {
+    return new BaiduUserError('百度登录组件缺失，请重新安装或重新解压完整的工具包后重试。');
+  }
+  if (error?.code === 'ENOENT' || /Executable[^\n]*(?:doesn't exist|does not exist|not found)|executable[^\n]*missing/i.test(detail)) {
+    return new BaiduUserError('未能找到可用的浏览器。请安装或修复 Microsoft Edge 或 Google Chrome，再重新尝试。');
+  }
+  return new BaiduUserError('百度登录窗口未能启动。请关闭工具此前打开的百度窗口后再试，或重新启动工具。');
+}
+
+const closedBrowserError = () => new BaiduUserError('工具正在关闭，请重新打开工具后再登录百度网盘。');
+
 export class BaiduBrowser {
   constructor(root, dataDir) {
     this.require = createRequire(path.join(root, 'package.json'));
@@ -11,6 +28,8 @@ export class BaiduBrowser {
     this.marker = path.join(this.profileDir, 'manju-authorized.json');
     this.context = null;
     this.starting = null;
+    this.loginStarting = null;
+    this.closed = false;
     this.headless = true;
     this.waiting = false;
     this.queue = Promise.resolve();
@@ -33,15 +52,23 @@ export class BaiduBrowser {
   }
 
   async launch(headless) {
+    if (this.closed) throw closedBrowserError();
     if (this.starting) return this.starting;
-    this.starting = (async () => {
+    const operation = (async () => {
       const executablePath = await this.browserPath();
-      if (!executablePath) throw new Error('请先安装 Microsoft Edge 或 Google Chrome，再打开百度登录窗口');
-      await fs.mkdir(this.profileDir, { recursive: true });
-      const { chromium } = this.require('playwright-core');
+      if (this.closed) throw closedBrowserError();
+      if (!executablePath) throw new BaiduUserError('请先安装 Microsoft Edge 或 Google Chrome，再打开百度登录窗口。');
+      try { await fs.mkdir(this.profileDir, { recursive: true }); }
+      catch { throw new BaiduUserError('百度登录资料目录无法写入，请检查本机目录权限后重试。'); }
+      if (this.closed) throw closedBrowserError();
+      let chromium;
+      try { ({ chromium } = this.require('playwright-core')); }
+      catch { throw new BaiduUserError('百度登录组件缺失，请重新安装或重新解压完整的工具包后重试。'); }
+      if (typeof chromium?.launchPersistentContext !== 'function') throw new BaiduUserError('百度登录组件不完整，请重新安装或重新解压完整的工具包后重试。');
       const context = await chromium.launchPersistentContext(this.profileDir, {
         executablePath, headless, viewport: null, timeout: 20000,
       });
+      if (this.closed) { await context.close().catch(() => {}); throw closedBrowserError(); }
       this.context = context;
       this.headless = headless;
       context.on('close', () => {
@@ -49,26 +76,66 @@ export class BaiduBrowser {
       });
       return context;
     })();
-    try { return await this.starting; } finally { this.starting = null; }
+    this.starting = operation;
+    try { return await operation; }
+    catch (error) { this.waiting = false; throw browserLaunchError(error); }
+    finally { if (this.starting === operation) this.starting = null; }
   }
 
-  async startLogin() {
-    if (this.starting) await this.starting;
-    if (this.context && this.headless) await this.context.close();
-    const context = this.context || await this.launch(false);
-    const page = context.pages()[0] || await context.newPage();
+  startLogin() {
+    if (this.closed) return Promise.reject(closedBrowserError());
+    if (this.loginStarting) return this.loginStarting;
+    // Reserve the foreground switch before awaiting a previous background launch.
+    // Status probes must not reopen the same profile in the gap after it closes.
     this.waiting = true;
-    await page.goto('https://pan.baidu.com/disk/main', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.bringToFront();
+    const operation = Promise.resolve().then(async () => {
+      try {
+        if (this.closed) throw closedBrowserError();
+        if (this.starting) await this.starting.catch(() => {});
+        if (this.closed) throw closedBrowserError();
+        if (this.context && this.headless) {
+          const background = this.context;
+          await background.close();
+          if (this.context === background) this.context = null;
+        }
+        const context = this.context || await this.launch(false);
+        if (this.closed) throw closedBrowserError();
+        this.waiting = true;
+        const page = context.pages()[0] || await context.newPage();
+        let warning = '';
+        try { await page.goto('https://pan.baidu.com/disk/main', { waitUntil: 'domcontentloaded', timeout: 30000 }); }
+        catch {
+          this.waiting = false;
+          warning = '百度登录窗口已打开，但登录页面加载失败。请在该窗口打开百度网盘，或点击“打开百度登录窗口”重试。';
+        }
+        try { await page.bringToFront(); }
+        catch {
+          this.waiting = false;
+          if (!warning) warning = '百度登录窗口已打开，但未能切到前台。请从任务栏打开该窗口，或重新尝试。';
+        }
+        return warning ? { warning } : {};
+      } catch (error) {
+        this.waiting = false;
+        throw browserLaunchError(error);
+      }
+    }).finally(() => {
+      if (this.loginStarting === operation) this.loginStarting = null;
+    });
+    this.loginStarting = operation;
+    return operation;
   }
 
   async status() {
     const installed = Boolean(await this.browserPath());
-    if (!this.context && !this.waiting) {
-      try { await fs.access(this.marker); if (installed) await this.launch(true); } catch {}
+    if (!this.closed && !this.context && !this.waiting && !this.loginStarting) {
+      try {
+        await fs.access(this.marker);
+        // Login may have started while the marker check was awaiting the disk.
+        if (installed && !this.closed && !this.context && !this.waiting && !this.loginStarting) await this.launch(true);
+      } catch {}
     }
     let loggedIn = false;
-    if (this.context) {
+    if (this.context && !this.closed) {
       try {
         const response = await this.context.request.get('https://pan.baidu.com/api/list?dir=%2F&num=1&page=1&web=1&clienttype=0&app_id=250528', { timeout: 10000 });
         loggedIn = (await response.json()).errno === 0;
@@ -78,7 +145,7 @@ export class BaiduBrowser {
         }
       } catch {}
     }
-    return { installed, loggedIn, loginState: this.waiting ? 'waiting' : loggedIn ? 'complete' : 'idle', folder: '/', method: 'browser' };
+    return { installed, loggedIn, loginState: this.closed ? 'idle' : this.loginStarting || this.waiting ? 'waiting' : loggedIn ? 'complete' : 'idle', folder: '/', method: 'browser' };
   }
 
   async save(share) {
@@ -181,7 +248,16 @@ export class BaiduBrowser {
   }
 
   async close() {
+    this.closed = true;
+    this.waiting = false;
+    const current = this.context;
+    if (current) await current.close().catch(() => {});
+    if (this.context === current) this.context = null;
+    if (this.loginStarting) await this.loginStarting.catch(() => {});
     if (this.starting) await this.starting.catch(() => {});
-    if (this.context) await this.context.close().catch(() => {});
+    const context = this.context;
+    if (context) await context.close().catch(() => {});
+    if (this.context === context) this.context = null;
+    this.waiting = false;
   }
 }

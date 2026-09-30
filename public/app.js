@@ -9,6 +9,7 @@ let baiduLoggedIn = false;
 let quarkPoll = null;
 let qrShown = false;
 let baiduPoll = null;
+let baiduLoginWarning = '';
 let currentSearch = null;
 
 async function refreshQuarkStatus() {
@@ -71,7 +72,7 @@ async function refreshBaiduStatus() {
     $('#baidu-auth-button').firstChild.textContent = data.loggedIn ? '重新打开百度窗口 ' : active ? '等待完成百度登录 ' : '打开百度登录窗口 ';
     $('#baidu-auth-message').textContent = !data.installed
       ? '请先安装 Edge 或 Chrome，再重新启动工具。'
-      : data.loggedIn ? '选择百度资源，点击“一键生成”，自动转存、分享并生成贴吧素材。' : active ? '请在打开的百度官方页面扫码或登录，完成后会自动更新状态。' : '点击打开百度登录窗口，完成登录即可一键生成发布素材。';
+      : data.loggedIn ? '选择百度资源，点击“一键生成”，自动转存、分享并生成贴吧素材。' : baiduLoginWarning || (active ? '请在打开的百度官方页面扫码或登录，完成后会自动更新状态。' : '点击打开百度登录窗口，完成登录即可一键生成发布素材。');
     if (baiduPoll) { clearTimeout(baiduPoll); baiduPoll = null; }
     if (active) baiduPoll = setTimeout(refreshBaiduStatus, 2500);
     document.querySelectorAll('.baidu-transfer-button:not([data-busy])').forEach((button) => {
@@ -82,12 +83,14 @@ async function refreshBaiduStatus() {
 
 $('#baidu-auth-button').addEventListener('click', async () => {
   const button = $('#baidu-auth-button');
+  baiduLoginWarning = '';
   button.disabled = true;
   $('#baidu-auth-message').textContent = '正在打开百度登录窗口…';
   try {
     const response = await fetch('/api/baidu/browser-login', { method: 'POST' });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || '无法打开百度登录窗口');
+    baiduLoginWarning = data.warning || '';
     await refreshBaiduStatus();
   } catch (error) { button.disabled = false; $('#baidu-auth-message').textContent = error.message || '无法打开百度登录窗口'; }
 });

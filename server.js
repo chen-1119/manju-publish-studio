@@ -17,13 +17,31 @@ import { BaiduBrowser } from './baidu-browser.js';
 import { BaiduUserError } from './baidu-web.js';
 import { selectTrending } from './trending.js';
 import { PipelineManager } from './pipeline.js';
+import { acquireServerInstance, APP_MARKER } from './server-instance.js';
+
+let startupInstance = null;
+function openToolPage(url) {
+  if (isSea() && !process.argv.includes('--no-browser')) {
+    const browser = spawn('explorer.exe', [url], { windowsHide: true, stdio: 'ignore' });
+    browser.on('error', () => console.error('浏览器未能自动打开，请手动访问上方地址。'));
+  }
+}
+
+async function main() {
 
 const root = isSea() ? path.dirname(process.execPath) : path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
 const dataDir = path.join(process.env.LOCALAPPDATA || root, 'ManjuPublishStudio');
+let port = Number(process.env.PORT || 4187);
+const instance = await acquireServerInstance(dataDir, { preferredUrl: `http://127.0.0.1:${port}` });
+if (instance.kind === 'existing') {
+  console.log(`漫剧发布工作台已在运行：${instance.url}`);
+  openToolPage(instance.url);
+  return;
+}
+startupInstance = instance;
 const configPath = path.join(dataDir, 'config.local.json');
 const searchConfig = new SearchConfig(configPath);
-let port = Number(process.env.PORT || 4187);
 const runFile = promisify(execFile);
 const quarkDir = path.join(dataDir, 'quark');
 const quarkEnv = { ...process.env, QUARK_CONFIG_DIR: quarkDir };
@@ -204,12 +222,18 @@ async function trendingSearch() {
   return { items: selectTrending(results), errors, refreshedAt: new Date().toISOString() };
 }
 
+let shuttingDown = false;
 const server = http.createServer(async (req, res) => {
+  if (shuttingDown) return json(res, 503, { error: '工具正在关闭，请稍后重新打开' });
   if (!localRequest(req)) return json(res, 403, { error: '仅允许本机访问' });
   const url = new URL(req.url, `http://${req.headers.host}`);
 
+  if (url.pathname === '/api/instance' && req.method === 'GET') {
+    return json(res, 200, { app: APP_MARKER, dataDirFingerprint: instance.identity.dataDirFingerprint, instanceId: instance.identity.instanceId });
+  }
+
   if (url.pathname === '/api/status' && req.method === 'GET') {
-    return json(res, 200, { app: 'manju-publish-studio', ...searchConfig.status(), indexed: true });
+    return json(res, 200, { app: APP_MARKER, ...searchConfig.status(), indexed: true });
   }
 
   if (url.pathname === '/api/publishing/jobs' && req.method === 'POST') {
@@ -294,9 +318,9 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/api/baidu/browser-login' && req.method === 'POST') {
     try {
-      await baiduBrowser.startLogin();
-      return json(res, 200, { loginState: 'waiting' });
-    } catch { return json(res, 502, { error: '百度登录窗口未能打开。请确认已安装 Edge 或 Chrome，并关闭此前的工具登录窗口后重试。' }); }
+      const login = await baiduBrowser.startLogin();
+      return json(res, 200, { loginState: login?.warning ? 'idle' : 'waiting', warning: login?.warning });
+    } catch (error) { return json(res, 502, { error: error instanceof BaiduUserError ? error.message : '百度登录窗口未能打开，请关闭此前的工具登录窗口后重试。' }); }
   }
 
   if (url.pathname === '/api/baidu/transfer' && req.method === 'POST') {
@@ -384,23 +408,36 @@ const server = http.createServer(async (req, res) => {
 
 let fallbackUsed = false;
 server.on('error', (error) => {
-  if (error.code === 'EADDRINUSE' && isSea() && !process.env.PORT && !fallbackUsed) {
+  if (error.code === 'EADDRINUSE' && !fallbackUsed) {
     fallbackUsed = true;
     server.listen(0, '127.0.0.1');
   } else {
     console.error(`漫剧发布工作台启动失败：${error.message}`);
+    instance.release();
     process.exitCode = 1;
   }
 });
 server.on('listening', () => {
   port = server.address().port;
-  console.log(`漫剧发布工作台已启动：http://127.0.0.1:${port}`);
-  if (isSea() && !process.argv.includes('--no-browser')) {
-    const browser = spawn('explorer.exe', [`http://127.0.0.1:${port}/`], { windowsHide: true, stdio: 'ignore' });
-    browser.on('error', () => console.error('浏览器未能自动打开，请手动访问上方地址。'));
-  }
+  const url = `http://127.0.0.1:${port}`;
+  try { instance.publish(url); }
+  catch (error) { console.error(`漫剧发布工作台启动失败：${error.message}`); server.close(); instance.release(); process.exitCode = 1; return; }
+  console.log(`漫剧发布工作台已启动：${url}`);
+  openToolPage(url);
 });
 server.listen(port, '127.0.0.1');
 for (const signal of ['SIGINT', 'SIGTERM']) {
-  process.on(signal, () => { baiduBrowser.close().finally(() => process.exit(0)); });
+  process.on(signal, () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    server.close();
+    baiduBrowser.close().finally(() => { instance.release(); process.exit(0); });
+  });
 }
+}
+
+main().catch((error) => {
+  startupInstance?.release();
+  console.error(`漫剧发布工作台启动失败：${error.message}`);
+  process.exitCode = 1;
+});
