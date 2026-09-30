@@ -27,7 +27,7 @@ function updateActions() {
   $('#publishing-stale').hidden = !stale;
 }
 function snapshot() {
-  return { version: 1, input: rawInput(), theme: $('#publishing-theme').value, reference, pack: pack ? { input: pack.input, title: $('#publishing-output-title').value, body: $('#publishing-output-body').value } : null, stale };
+  return { version: 1, input: rawInput(), theme: $('#publishing-theme').value, reference, pack: pack ? { input: pack.input, title: $('#publishing-output-title').value, body: $('#publishing-output-body').value, warnings: pack.warnings } : null, stale };
 }
 function showReference() {
   $('#publishing-reference').hidden = !reference;
@@ -111,7 +111,9 @@ async function restore(state, selectedArtwork = null) {
   $('#publishing-empty').hidden = false;
   if (state.pack) {
     try {
-      populatePack(generatePublishingPack(state.pack.input || state.input), state.pack);
+      const generated = generatePublishingPack(state.pack.input || state.input);
+      if (Array.isArray(state.pack.warnings)) generated.warnings = state.pack.warnings.filter((value) => typeof value === 'string').slice(0, 10).map((value) => value.slice(0, 500));
+      populatePack(generated, state.pack);
       stale = Boolean(state.stale);
       await renderGraphics();
     } catch { message('草稿资料尚未完整，请补充后生成。'); }
@@ -148,6 +150,25 @@ document.addEventListener('publishing:select', async (event) => {
   }
   openEditor();
   form.elements.synopsis.focus({ preventScroll: true });
+});
+
+document.addEventListener('publishing:ready', async (event) => {
+  const job = event.detail;
+  if (job?.status !== 'completed' || !job.result?.input || !job.ownShare) return;
+  const key = `pipeline:${job.id}`;
+  if (activeKey === key && pack) { openEditor(); return; }
+  sessionDrafts.set(activeKey, { state: snapshot(), artwork });
+  activeKey = key;
+  const existing = sessionDrafts.get(key);
+  if (existing) await restore(existing.state, existing.artwork);
+  else {
+    const input = job.result.input;
+    await restore({ input, reference: { title: job.input?.resource?.title || input.title,
+      description: '已确认本次转存完成，领取链接由你的百度网盘账号创建。介绍、集数和完结状态可继续补充。',
+      url: job.input?.resource?.shareUrl || '' }, pack: { input, warnings: job.result.pack?.warnings } });
+  }
+  openEditor();
+  message(graphicsReady ? '自动流程已完成：自己的分享链接、贴吧文案、封面和目录图已就绪，可修改、复制或下载。' : '自己的分享链接和文案已生成，配图暂时未能生成。');
 });
 
 form.addEventListener('submit', async (event) => {

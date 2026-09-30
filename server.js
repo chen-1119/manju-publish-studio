@@ -16,6 +16,7 @@ import { baiduShareInput } from './baidu.js';
 import { BaiduBrowser } from './baidu-browser.js';
 import { BaiduUserError } from './baidu-web.js';
 import { selectTrending } from './trending.js';
+import { PipelineManager } from './pipeline.js';
 
 const root = isSea() ? path.dirname(process.execPath) : path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
@@ -38,6 +39,65 @@ const baiduPending = new Map();
 let loginState = 'idle';
 let loginProcess = null;
 const activeTransfers = new Set();
+const pipelinePath = path.join(dataDir, 'publishing-jobs.json');
+const pipeline = new PipelineManager({
+  adapter: {
+    async save(share) {
+      const key = createHash('sha256').update(`root:${share.url}#${share.code}`).digest('hex');
+      const existing = baiduPending.get(key);
+      if (existing) {
+        if (existing.receiptId) return { ...existing };
+        const error = new BaiduUserError('已有旧版本转存任务缺少确认凭据，请先在百度网盘核对，工具不会重复保存');
+        error.transferStarted = false;
+        throw error;
+      }
+      if (activeTransfers.has(key)) {
+        const error = new BaiduUserError('该资源正在转存，请稍后继续任务');
+        error.transferStarted = false;
+        throw error;
+      }
+      activeTransfers.add(key);
+      try {
+        const result = await baiduBrowser.save(share);
+        if (['submitted', 'pending'].includes(result.kind)) {
+          baiduPending.set(key, { ...result, createdAt: Date.now() });
+          await saveBaiduPending();
+        }
+        return result;
+      } finally { activeTransfers.delete(key); }
+    },
+    async waitForTransfer(result) {
+      const deadline = Date.now() + 15 * 60 * 1000;
+      let current = result;
+      do {
+        current = await baiduBrowser.waitForTransfer(current, { timeoutMs: Math.min(60000, deadline - Date.now()) });
+        if (current.kind === 'saved') {
+          for (const [key, entry] of baiduPending) if (entry.receiptId === current.receiptId) baiduPending.delete(key);
+          await saveBaiduPending().catch(() => {});
+          return current;
+        }
+        if (!['submitted', 'pending'].includes(current.kind)) return current;
+        if (Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 2000));
+      } while (Date.now() < deadline);
+      return current;
+    },
+    async createShare(result) {
+      const share = await baiduBrowser.createShare(result, { period: 7 });
+      return { url: share.shareUrl, accessCode: share.accessCode, verified: share.verified };
+    },
+  },
+  async loadState() {
+    try { return JSON.parse(await fs.readFile(pipelinePath, 'utf8')); }
+    catch (error) { if (error.code === 'ENOENT') return null; throw new Error('任务记录无法读取，请先保留并检查本机 publishing-jobs.json 文件'); }
+  },
+  async saveState(state) {
+    await fs.mkdir(dataDir, { recursive: true });
+    await fs.writeFile(`${pipelinePath}.tmp`, JSON.stringify(state), { mode: 0o600 });
+    await fs.rename(`${pipelinePath}.tmp`, pipelinePath);
+  },
+});
+// Invalid state is reported by task routes without crashing unrelated search.
+pipeline.ready.catch(() => {});
 try {
   const entries = JSON.parse(readFileSync(baiduPendingPath, 'utf8'));
   for (const [key, entry] of Object.entries(entries)) {
@@ -150,6 +210,30 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/api/status' && req.method === 'GET') {
     return json(res, 200, { app: 'manju-publish-studio', ...searchConfig.status(), indexed: true });
+  }
+
+  if (url.pathname === '/api/publishing/jobs' && req.method === 'POST') {
+    try {
+      const input = await readJson(req);
+      if (!(await baiduBrowser.status()).loggedIn) return json(res, 401, { error: '请先登录自己的百度网盘，完成后点击“继续任务”。' });
+      let job = await pipeline.start(input);
+      if (job.canRetry) job = await pipeline.resume(job.id);
+      return json(res, 202, job);
+    } catch (error) { return json(res, error.statusCode || 400, { error: error.message || '无法启动自动流程' }); }
+  }
+  const jobRoute = /^\/api\/publishing\/jobs\/([a-zA-Z0-9_-]+)(\/retry)?$/.exec(url.pathname);
+  if (jobRoute) {
+    try {
+      await pipeline.ready;
+      const job = pipeline.get(jobRoute[1]);
+      if (!job) return json(res, 404, { error: '没有找到这项任务，请从搜索结果重新选择资源' });
+      if (!jobRoute[2] && req.method === 'GET') return json(res, 200, job);
+      if (jobRoute[2] && req.method === 'POST') {
+        if (!(await baiduBrowser.status()).loggedIn) return json(res, 401, { error: '百度登录已失效，请完成登录后继续任务' });
+        return json(res, 202, await pipeline.resume(jobRoute[1]));
+      }
+      return json(res, 405, { error: '不支持此任务操作' });
+    } catch (error) { return json(res, error.statusCode || 400, { error: error.message || '任务暂时无法继续' }); }
   }
 
   if (url.pathname === '/api/quark/status' && req.method === 'GET') {
@@ -280,7 +364,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method !== 'GET') return json(res, 405, { error: '不支持此操作' });
-  const routes = { '/': 'index.html', '/app.js': 'app.js', '/style.css': 'style.css', '/publish.js': 'publish.js', '/publish-core.js': 'publish-core.js', '/publish-poster.js': 'publish-poster.js' };
+  const routes = { '/': 'index.html', '/app.js': 'app.js', '/style.css': 'style.css', '/publish.js': 'publish.js', '/publish-core.js': 'publish-core.js', '/publish-poster.js': 'publish-poster.js', '/pipeline-ui.js': 'pipeline-ui.js' };
   const file = routes[url.pathname];
   if (!file) return json(res, 404, { error: '页面不存在' });
   try {

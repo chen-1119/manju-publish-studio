@@ -71,7 +71,7 @@ async function refreshBaiduStatus() {
     $('#baidu-auth-button').firstChild.textContent = data.loggedIn ? '重新打开百度窗口 ' : active ? '等待完成百度登录 ' : '打开百度登录窗口 ';
     $('#baidu-auth-message').textContent = !data.installed
       ? '请先安装 Edge 或 Chrome，再重新启动工具。'
-      : data.loggedIn ? '现在可以一键保存到百度网盘根目录。' : active ? '请在打开的百度官方页面扫码或登录，完成后会自动更新状态。' : '点击打开百度登录窗口，完成登录即可转存到根目录。';
+      : data.loggedIn ? '选择百度资源，点击“一键生成”，自动转存、分享并生成贴吧素材。' : active ? '请在打开的百度官方页面扫码或登录，完成后会自动更新状态。' : '点击打开百度登录窗口，完成登录即可一键生成发布素材。';
     if (baiduPoll) { clearTimeout(baiduPoll); baiduPoll = null; }
     if (active) baiduPoll = setTimeout(refreshBaiduStatus, 2500);
     document.querySelectorAll('.baidu-transfer-button:not([data-busy])').forEach((button) => {
@@ -163,7 +163,7 @@ function createResultCard(result) {
   domain.title = domain.textContent;
   const actions = document.createElement('div');
   actions.className = 'result-actions';
-  if (result.direct && ['quark', 'baidu'].includes(result.platform)) {
+  if (result.direct && result.platform === 'quark') {
     const isBaidu = result.platform === 'baidu';
     const transfer = document.createElement('button');
     transfer.type = 'button';
@@ -232,9 +232,10 @@ function createResultCard(result) {
   const publishing = document.createElement('button');
   publishing.type = 'button';
   publishing.className = 'publishing-card-button';
-  publishing.textContent = '制作发布素材';
+  publishing.textContent = result.direct && result.platform === 'baidu' ? '一键生成：转存 → 分享 → 文案' : '手动制作素材';
+  if (result.direct && result.platform === 'baidu') publishing.classList.add('pipeline-card-button');
   publishing.addEventListener('click', () => {
-    document.dispatchEvent(new CustomEvent('publishing:select', { detail: result }));
+    document.dispatchEvent(new CustomEvent(result.direct && result.platform === 'baidu' ? 'pipeline:start' : 'publishing:select', { detail: result }));
   });
   actions.append(publishing, source);
   bottom.append(domain, actions);
@@ -332,7 +333,10 @@ function renderResults(data) {
     if (!results.length) {
       showEmpty(platform, '没有找到匹配结果', '试试缩短关键词、放宽时间范围，或打开网页搜索。');
     } else {
-      $(`#${platform}-results`).replaceChildren(...results.map(createResultCard));
+      $(`#${platform}-results`).replaceChildren(...results.map((result) => {
+        result.searchKeyword ||= currentSearch?.params.get('q') || '';
+        return createResultCard(result);
+      }));
     }
     if (data.warnings?.[platform]?.length) {
       const warning = document.createElement('p');
