@@ -30,7 +30,7 @@
         <div class="hero-copy">
           <p class="eyebrow"><span class="eyebrow-line"></span> RESOURCE FINDER / BAIDU × QUARK</p>
           <h1 id="page-title">找到资源，<br><em>写成一篇好帖子。</em></h1>
-          <p class="hero-description">输入关键词，选择百度资源，一键转存到自己的网盘、创建自己的分享链接，再生成贴吧文案与两张配图。</p>
+          <p class="hero-description">输入关键词，选择百度资源，一键转存、创建带提取码的自己的分享链接，再生成简短关键词文案。图片可选。</p>
         </div>
         <div class="hero-art" aria-hidden="true">
           <div class="orbit orbit-one"></div>
@@ -158,7 +158,7 @@
 
       <section id="publishing-section" class="publishing-section" aria-labelledby="publishing-title">
         <div class="publishing-heading">
-          <div><p class="section-kicker">STUDIO / 发布素材</p><h2 id="publishing-title">自己的链接，自己的帖子。</h2><p>搜索结果中选择百度资源后，一键完成转存、分享和素材生成；文案和配图可继续修改。</p></div>
+          <div><p class="section-kicker">STUDIO / 发布素材</p><h2 id="publishing-title">自己的链接，自己的帖子。</h2><p>一键生成带提取码的分享链接和关键词文案。图片可按需添加，没有图片也可直接发布。</p></div>
           <span class="publishing-badge">本地模板 · 无需密钥</span>
         </div>
         <div id="pipeline-panel" class="pipeline-panel" hidden>
@@ -179,30 +179,30 @@
                 <div><label for="publishing-genre">题材 / 主题</label><input id="publishing-genre" name="genre" maxlength="40" placeholder="例如：科幻、古风、角色一致性"></div>
               </div>
               <label for="publishing-synopsis">作品介绍 / 分享内容</label>
-              <textarea id="publishing-synopsis" name="synopsis" rows="4" maxlength="1000" placeholder="写你确认过的剧情、看点或教程内容。介绍和目录至少填写一项。"></textarea>
+              <textarea id="publishing-synopsis" name="synopsis" rows="4" maxlength="1000" placeholder="可选：补充你确认过的剧情、看点或教程内容。"></textarea>
               <div class="publishing-field-pair">
                 <div><label for="publishing-episodes">更新集数 / 版本</label><input id="publishing-episodes" name="episodes" maxlength="60" placeholder="例如：第1—8集；不要猜测集数"></div>
                 <div><label for="publishing-completion">更新状态</label><select id="publishing-completion" name="completion"><option value="unknown">尚未确认</option><option value="ongoing">持续更新</option><option value="complete">已完结</option></select></div>
               </div>
-              <label for="publishing-resources">实际文件目录 <span>每行一项</span></label>
-              <textarea id="publishing-resources" name="resources" rows="3" maxlength="1200" placeholder="第01集.mp4&#10;第02集.mp4&#10;作品介绍.txt"></textarea>
+              <label for="publishing-keywords">内容关键词 <span>最多6个，空格或逗号分隔</span></label>
+              <input id="publishing-keywords" name="keywords" maxlength="180" value="AI漫剧、作品资源、资源分享" placeholder="例如：AI漫剧、古风、资源分享">
               <div class="publishing-step"><span>02</span><h3>自己的领取链接</h3></div>
               <label for="publishing-share-url">自己的网盘分享链接 <span>自动流程完成后填入</span></label>
-              <input id="publishing-share-url" name="ownShareUrl" type="url" maxlength="500" placeholder="https://pan.baidu.com/s/…">
+              <input id="publishing-share-url" name="ownShareUrl" type="url" maxlength="500" placeholder="https://pan.baidu.com/s/…?pwd=abcd">
               <div class="publishing-field-pair">
                 <div><label for="publishing-access-code">自己的提取码</label><input id="publishing-access-code" name="ownAccessCode" maxlength="4" pattern="[A-Za-z0-9]{4}" placeholder="4位字母或数字"></div>
                 <div><label for="publishing-target-bar">目标贴吧</label><input id="publishing-target-bar" name="targetBar" maxlength="40" value="AI漫剧吧"></div>
               </div>
-              <p class="publishing-hint">百度“一键生成”会自动填入你创建的分享链接与提取码；手动制作时也可自行填写。</p>
+              <p class="publishing-hint">提取码会自动放进链接的 pwd 参数中，复制一个链接即可。修改提取码后重新生成即可更新链接。</p>
               <label for="publishing-tone">文案风格</label>
               <select id="publishing-tone" name="tone"><option value="clear">清晰介绍</option><option value="friendly">轻松推荐</option><option value="update">更新公告</option></select>
-              <button class="publishing-primary" id="publishing-generate" type="submit" disabled>生成文案与配图 <span aria-hidden="true">↗</span></button>
+              <button class="publishing-primary" id="publishing-generate" type="submit" disabled>生成文案 <span aria-hidden="true">↗</span></button>
             </form>
             <div class="publishing-draft-actions"><button id="publishing-save" type="button" disabled>保存本机草稿</button><button id="publishing-load" type="button" disabled>恢复上次草稿</button></div>
             <p id="publishing-status" role="status" aria-live="polite">文案由本地模板整理，配图由本机排版生成。</p>
           </div>
           <div class="publishing-output">
-            <div id="publishing-empty" class="publishing-empty"><span class="publishing-empty-mark" aria-hidden="true">Aa ↗</span><h3>一份资源，一组发布素材。</h3><p>3 个标题备选 · 贴吧正文<br>封面图 · 目录图 · AI 创作提示词</p><p>先填写左侧资料，再生成预览。</p></div>
+            <div id="publishing-empty" class="publishing-empty"><span class="publishing-empty-mark" aria-hidden="true">Aa ↗</span><h3>一个链接，一篇分享。</h3><p>3 个标题备选 · 简短关键词<br>带提取码的分享链接 · 可选配图</p><p>填写资料后即可生成文案，没有图片也可发布。</p></div>
             <div id="publishing-pack" hidden>
               <div class="publishing-step"><span>03</span><h3>预览与修改</h3><span class="publishing-editable">可编辑</span></div>
               <p id="publishing-warnings" class="publishing-warnings" role="status" hidden></p>
@@ -211,6 +211,7 @@
               <label for="publishing-output-title">发布标题</label><input id="publishing-output-title" maxlength="160">
               <label for="publishing-output-body">贴吧正文</label><textarea id="publishing-output-body" rows="12" maxlength="12000"></textarea>
               <div class="publishing-actions"><button id="publishing-copy" type="button" data-pack-action>复制标题与正文</button><button id="publishing-download-text" type="button" data-pack-action>下载文案 .txt</button><button id="publishing-download-pack" type="button" data-pack-action>导出素材清单 .json</button></div>
+              <details id="publishing-optional-images" class="publishing-optional-images"><summary>配图（可选，没有图片也可发布）</summary>
               <div class="publishing-image-controls">
                 <div><label for="publishing-theme">配图色系</label><select id="publishing-theme"><option value="forest">森林绿</option><option value="ink">深夜蓝</option><option value="paper">暖纸色</option></select></div>
                 <div><label for="publishing-artwork">上传自己的封面 / 剧照</label><input id="publishing-artwork" type="file" accept="image/png,image/jpeg,image/webp"><button id="publishing-clear-artwork" type="button" hidden>移除图片</button></div>
@@ -218,8 +219,9 @@
               <p id="publishing-image-status" class="publishing-hint" role="status">默认使用抽象图形排版。上传图片仅在本机使用。</p>
               <div class="publishing-images">
                 <figure><canvas id="publishing-cover" width="1200" height="900" role="img" aria-label="发布封面图预览"></canvas><figcaption><span>封面 · 1200 × 900</span><button id="publishing-download-cover" type="button" data-pack-action>下载 PNG ↗</button></figcaption></figure>
-                <figure><canvas id="publishing-directory" width="1200" height="900" role="img" aria-label="资源目录图预览"></canvas><figcaption><span>目录 · 1200 × 900</span><button id="publishing-download-directory" type="button" data-pack-action>下载 PNG ↗</button></figcaption></figure>
+                <figure><canvas id="publishing-directory" width="1200" height="900" role="img" aria-label="内容关键词图预览"></canvas><figcaption><span>关键词 · 1200 × 900</span><button id="publishing-download-directory" type="button" data-pack-action>下载 PNG ↗</button></figcaption></figure>
               </div>
+              </details>
               <details class="publishing-ai-prompts"><summary>继续用 AI 改写或绘图</summary><p>复制提示词到你使用的 AI 服务。这里不会调用模型；生成插画时请注明“概念配图”。</p><label for="publishing-text-prompt">文案提示词</label><textarea id="publishing-text-prompt" rows="5" readonly></textarea><button id="publishing-copy-text-prompt" type="button" data-pack-action>复制文案提示词</button><label for="publishing-image-prompt">配图提示词</label><textarea id="publishing-image-prompt" rows="4" readonly></textarea><button id="publishing-copy-image-prompt" type="button" data-pack-action>复制配图提示词</button></details>
             </div>
           </div>

@@ -36,8 +36,17 @@ function normalize(input) {
   const shareUrl = string(data.ownShareUrl).trim();
   const clean = (value) => displayText(shareUrl ? string(value).split(shareUrl).join('') : value, secret);
   const mode = data.mode === 'making' ? 'making' : 'works';
-  const source = Array.isArray(data.resources) ? data.resources : string(data.resources).split(/\r?\n/);
-  const resources = source.map((line) => clean(line).replace(/^[\s•●\-*]+/, '').trim()).filter(Boolean);
+  const genre = truncate(clean(data.genre), 30);
+  const source = Array.isArray(data.keywords) ? data.keywords : [data.keywords];
+  let keywords = source.flatMap((item) => clean(item).split(/[\s,，、·#]+/u)).filter(Boolean);
+  if (!keywords.length) keywords = ['AI漫剧', mode === 'making' ? '制作资料' : '作品资源', genre].filter(Boolean);
+  const seen = new Set();
+  keywords = keywords.map((item) => truncate(item, 20)).filter((item) => {
+    const key = item.toLocaleLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 6);
   const completion = data.completion === 'complete' ? '已完结' : data.completion === 'ongoing' ? '连载中' : '';
   const title = truncate(clean(data.title) || (mode === 'making' ? 'AI 漫剧制作资源' : 'AI 漫剧资源介绍'), 80);
   return {
@@ -45,10 +54,10 @@ function normalize(input) {
     hasShare: Boolean(shareUrl),
     title,
     synopsis: clean(data.synopsis),
-    genre: truncate(clean(data.genre), 30),
+    genre,
     episodes: truncate(clean(data.episodes), 36),
     completion,
-    resources,
+    keywords,
     targetBar: truncate(clean(data.targetBar), 32),
   };
 }
@@ -136,7 +145,7 @@ function background(ctx, palette, data, kind) {
   ctx.fillStyle = palette.muted;
   font(ctx, 16, 500);
   ctx.fillText(data.mode === 'making' ? '制作资源 / CREATOR RESOURCES' : '作品资源 / STORY RESOURCES', 76, 96);
-  const label = kind === 'directory' ? '资源目录' : '资源介绍';
+  const label = kind === 'directory' ? '内容关键词' : '资源介绍';
   chip(ctx, label, 1014, 57, palette, true, 110);
   ctx.strokeStyle = palette.line;
   ctx.lineWidth = 1;
@@ -232,7 +241,7 @@ function cover(ctx, data, palette, image) {
   tags(ctx, data, 76, 182, 665, palette);
   const titleHeight = titleBlock(ctx, data.title, 76, 253, 665, 278, palette);
   const summaryY = 253 + titleHeight + 29;
-  const summary = data.synopsis || (data.mode === 'making' ? '制作内容、文件目录与使用说明见正文。' : '作品介绍与资源目录见正文。');
+  const summary = data.synopsis || (data.mode === 'making' ? '制作内容与使用说明见正文。' : '作品介绍与内容关键词见正文。');
   paragraph(ctx, summary, 76, summaryY, 655, {
     size: 25, lineHeight: 38, maxLines: 3, color: palette.muted,
   });
@@ -242,36 +251,28 @@ function cover(ctx, data, palette, image) {
   ctx.fillText(ellipsis(ctx, info, 665), 76, 722);
   ctx.fillStyle = palette.muted;
   font(ctx, 16);
-  ctx.fillText(data.resources.length ? `已填写 ${data.resources.length} 项资源 · 目录见正文` : '文件目录待补充', 76, 758);
+  ctx.fillText(ellipsis(ctx, `内容关键词 · ${data.keywords.join(' / ')}`, 665), 76, 758);
 }
 
 function directory(ctx, data, palette) {
   titleBlock(ctx, data.title, 76, 145, 1048, 155, palette, 62);
   tags(ctx, data, 76, 312, 1048, palette);
-  const rows = data.resources.length ? data.resources.slice(0, 8) : [
-    `内容类型：${data.mode === 'making' ? 'AI 漫剧制作资源' : 'AI 漫剧作品资源'}`,
-    `题材：${data.genre || '待补充'}`,
-    `更新 / 集数：${data.episodes || '待补充'}`,
-    `更新状态：${data.completion || '待确认'}`,
-  ];
-  const rowHeight = 47;
-  rows.forEach((item, index) => {
-    const y = 374 + index * rowHeight;
-    rounded(ctx, 76, y - 3, 1048, rowHeight - 5, 8);
-    ctx.fillStyle = index % 2 ? palette.background : palette.paper;
+  data.keywords.forEach((item, index) => {
+    const x = 76 + (index % 2) * 534;
+    const y = 374 + Math.floor(index / 2) * 116;
+    rounded(ctx, x, y, 514, 102, 16);
+    ctx.fillStyle = index === 0 ? palette.panel : palette.paper;
     ctx.fill();
     ctx.fillStyle = palette.muted;
-    font(ctx, 16, 600);
-    ctx.fillText(String(index + 1).padStart(2, '0'), 94, y + 8);
-    paragraph(ctx, item, 145, y + 3, 953, {
-      size: 19, lineHeight: 20, maxLines: 2, color: palette.ink,
+    font(ctx, 29, 500);
+    ctx.fillText('#', x + 23, y + 30);
+    paragraph(ctx, item, x + 64, y + 19, 422, {
+      size: 29, lineHeight: 34, maxLines: 2, color: palette.ink, weight: 500,
     });
   });
   ctx.fillStyle = palette.muted;
   font(ctx, 18);
-  const note = !data.resources.length ? '文件目录待补充' : data.resources.length > 8
-    ? `+ ${data.resources.length - 8} 项，完整目录见正文` : `共 ${data.resources.length} 项 · 文件详情见正文`;
-  ctx.fillText(note, 76, 766);
+  ctx.fillText('内容介绍见正文', 76, 766);
 }
 
 /**

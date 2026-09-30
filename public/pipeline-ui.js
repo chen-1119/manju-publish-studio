@@ -1,3 +1,4 @@
+import { shareLinkWithCode } from './publish-core.js';
 const $ = (selector) => document.querySelector(selector);
 const recentKey = 'manju-publish-studio:pipeline-job:v1';
 let activeJob = null;
@@ -44,10 +45,10 @@ function render(job) {
   const link = $('#pipeline-own-link');
   link.hidden = true;
   try {
-    const url = new URL(job.ownShare?.url || job.ownShare?.shareUrl || '');
+    const url = new URL(shareLinkWithCode(job.ownShare?.url || job.ownShare?.shareUrl || '', job.ownShare?.accessCode));
     if (job.status === 'completed' && url.protocol === 'https:' && url.hostname === 'pan.baidu.com') {
       link.href = url.href;
-      link.textContent = `打开自己的分享 ↗${job.ownShare.accessCode ? ` · 提取码 ${job.ownShare.accessCode}` : ''}`;
+      link.textContent = '打开自己的分享（已带提取码） ↗';
       link.hidden = false;
     }
   } catch { /* Own link is available only after the verified share step. */ }

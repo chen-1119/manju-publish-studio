@@ -1,10 +1,10 @@
-import { generatePublishingPack } from './publish-core.js';
+import { generatePublishingPack, normalizePublishingKeywords, shareLinkWithCode } from './publish-core.js';
 import { renderPublishingPoster } from './publish-poster.js';
 
 const $ = (selector) => document.querySelector(selector);
 const form = $('#publishing-form');
 const storageKey = 'manju-publish-studio:publishing-draft:v1';
-const fields = ['title', 'mode', 'synopsis', 'genre', 'episodes', 'completion', 'resources', 'ownShareUrl', 'ownAccessCode', 'targetBar', 'tone'];
+const fields = ['title', 'mode', 'synopsis', 'genre', 'episodes', 'completion', 'keywords', 'ownShareUrl', 'ownAccessCode', 'targetBar', 'tone'];
 const sessionDrafts = new Map();
 let activeKey = 'manual';
 let reference = null;
@@ -20,6 +20,14 @@ function rawInput() { return Object.fromEntries(fields.map((key) => [key, form.e
 function setInput(raw = {}) {
   form.reset();
   for (const key of fields) if (typeof raw[key] === 'string') form.elements[key].value = raw[key].slice(0, form.elements[key].maxLength > 0 ? form.elements[key].maxLength : 1200);
+  if (!raw.keywords) form.elements.keywords.value = normalizePublishingKeywords(undefined, { ...raw, genre: '' });
+  if (raw.ownShareUrl) {
+    try {
+      const link = shareLinkWithCode(raw.ownShareUrl, raw.ownAccessCode);
+      form.elements.ownShareUrl.value = link;
+      form.elements.ownAccessCode.value = new URL(link).searchParams.get('pwd') || '';
+    } catch { /* Keep invalid drafts editable for correction. */ }
+  }
 }
 function updateActions() {
   document.querySelectorAll('[data-pack-action]').forEach((button) => { button.disabled = !pack || stale; });
@@ -27,7 +35,7 @@ function updateActions() {
   $('#publishing-stale').hidden = !stale;
 }
 function snapshot() {
-  return { version: 1, input: rawInput(), theme: $('#publishing-theme').value, reference, pack: pack ? { input: pack.input, title: $('#publishing-output-title').value, body: $('#publishing-output-body').value, warnings: pack.warnings } : null, stale };
+  return { version: 2, input: rawInput(), theme: $('#publishing-theme').value, reference, pack: pack ? { input: pack.input, title: $('#publishing-output-title').value, body: $('#publishing-output-body').value, warnings: pack.warnings } : null, stale };
 }
 function showReference() {
   $('#publishing-reference').hidden = !reference;
@@ -46,6 +54,9 @@ function showReference() {
 function populatePack(generated, edited = null) {
   pack = generated;
   stale = false;
+  form.elements.ownShareUrl.value = generated.input.ownShareUrl;
+  form.elements.ownAccessCode.value = generated.input.ownAccessCode;
+  form.elements.keywords.value = generated.input.keywords;
   $('#publishing-empty').hidden = true;
   $('#publishing-pack').hidden = false;
   $('#publishing-output-title').value = typeof edited?.title === 'string' ? edited.title.slice(0, 160) : generated.titles[0];
@@ -69,6 +80,10 @@ async function renderGraphics() {
   const sequence = ++renderSequence;
   graphicsReady = false;
   updateActions();
+  if (!$('#publishing-optional-images').open && !artwork) {
+    $('#publishing-image-status').textContent = '图片为可选项，没有图片也可直接复制文案发布。';
+    return;
+  }
   const input = pack.input;
   const theme = $('#publishing-theme').value;
   const selectedArtwork = artwork;
@@ -87,7 +102,7 @@ async function renderGraphics() {
       canvas.getContext('2d').drawImage(rendered, 0, 0);
     }
     graphicsReady = true;
-    $('#publishing-image-status').textContent = selectedArtwork ? '封面使用你上传的图片，目录图按实际文件排版。图片仅在本机使用。' : '配图使用抽象图形与文字排版。可以上传自己的封面或剧照。';
+    $('#publishing-image-status').textContent = selectedArtwork ? '封面使用你上传的图片，关键词图按内容关键词排版。图片仅在本机使用。' : '配图使用抽象图形与关键词排版。没有图片也可直接发布文案。';
   } catch {
     if (sequence === renderSequence) $('#publishing-image-status').textContent = '图片预览生成失败，请重新生成或更换上传图片。';
   }
@@ -112,9 +127,9 @@ async function restore(state, selectedArtwork = null) {
   if (state.pack) {
     try {
       const generated = generatePublishingPack(state.pack.input || state.input);
-      if (Array.isArray(state.pack.warnings)) generated.warnings = state.pack.warnings.filter((value) => typeof value === 'string').slice(0, 10).map((value) => value.slice(0, 500));
+      if (state.version === 2 && Array.isArray(state.pack.warnings)) generated.warnings = state.pack.warnings.filter((value) => typeof value === 'string').slice(0, 10).map((value) => value.slice(0, 500));
       populatePack(generated, state.pack);
-      stale = Boolean(state.stale);
+      stale = Boolean(state.stale) || !state.pack.input?.keywords;
       await renderGraphics();
     } catch { message('草稿资料尚未完整，请补充后生成。'); }
   }
@@ -129,7 +144,6 @@ document.addEventListener('publishing:select', async (event) => {
   const result = event.detail;
   if (!result || typeof result.title !== 'string') return;
   const key = result.shareUrl || result.sourceUrl || result.title;
-  const directory = Array.isArray(result.transferFiles) ? result.transferFiles.map((file) => file.name || file.path || '').filter(Boolean).join('\n').slice(0, 1200) : '';
   if (activeKey !== key) {
     sessionDrafts.set(activeKey, { state: snapshot(), artwork });
     activeKey = key;
@@ -137,16 +151,11 @@ document.addEventListener('publishing:select', async (event) => {
     if (existing) await restore(existing.state, existing.artwork);
     else {
       await restore({
-        input: { title: result.title.slice(0, 80), mode: 'works', resources: directory },
+        input: { title: result.title.slice(0, 80), mode: 'works' },
         reference: { title: result.title.slice(0, 200), description: String(result.description || '').slice(0, 1200), url: result.shareUrl || result.sourceUrl || '' },
       });
     }
     message('已带入资源名称。请核对作品介绍、更新集数，并填入自己的分享链接。切换资源时会保留本次打开的草稿。');
-  }
-  if (directory && !form.elements.resources.value.trim()) {
-    form.elements.resources.value = directory;
-    if (pack) { stale = true; renderSequence += 1; updateActions(); }
-    message('已带入实际转存完成的文件目录，请核对后生成素材。');
   }
   openEditor();
   form.elements.synopsis.focus({ preventScroll: true });
@@ -165,10 +174,10 @@ document.addEventListener('publishing:ready', async (event) => {
     const input = job.result.input;
     await restore({ input, reference: { title: job.input?.resource?.title || input.title,
       description: '已确认本次转存完成，领取链接由你的百度网盘账号创建。介绍、集数和完结状态可继续补充。',
-      url: job.input?.resource?.shareUrl || '' }, pack: { input, warnings: job.result.pack?.warnings } });
+      url: job.input?.resource?.shareUrl || '' }, version: 2, pack: { input, warnings: job.result.pack?.warnings } });
   }
   openEditor();
-  message(graphicsReady ? '自动流程已完成：自己的分享链接、贴吧文案、封面和目录图已就绪，可修改、复制或下载。' : '自己的分享链接和文案已生成，配图暂时未能生成。');
+  message('自动流程已完成：带提取码的分享链接与关键词文案已就绪，可修改、复制或下载。图片可按需添加。');
 });
 
 form.addEventListener('submit', async (event) => {
@@ -176,9 +185,9 @@ form.addEventListener('submit', async (event) => {
   try {
     const generated = generatePublishingPack(rawInput());
     populatePack(generated);
-    message('已生成 3 个标题、贴吧正文和 AI 提示词，正在排版图片…');
+    message('已生成 3 个标题和关键词正文，领取链接已带提取码。');
     await renderGraphics();
-    if (!stale) message(graphicsReady ? '文案与两张配图已就绪。确认内容后可复制或下载。' : '文案已生成，图片暂时未能生成。');
+    if (!stale) message(graphicsReady ? '文案与可选配图已就绪，可复制或下载。' : '文案已就绪，可直接复制或下载；图片为可选项。');
   } catch (error) { message(error.message || '请补充资源信息后重试。'); }
 });
 form.addEventListener('input', () => {
@@ -208,11 +217,11 @@ function downloadBlob(blob, name) {
 $('#publishing-copy').addEventListener('click', () => copyText(documentText()));
 $('#publishing-download-text').addEventListener('click', () => downloadBlob(new Blob(['\ufeff', documentText()], { type: 'text/plain;charset=utf-8' }), filename('贴吧文案.txt')));
 $('#publishing-download-pack').addEventListener('click', () => {
-  const output = { version: 1, generatedBy: 'local-template', input: pack.input, titles: pack.titles, selectedTitle: $('#publishing-output-title').value, body: $('#publishing-output-body').value, textPrompt: pack.textPrompt, imagePrompt: pack.imagePrompt, theme: $('#publishing-theme').value, warnings: pack.warnings, graphics: { cover: filename('封面.png'), directory: filename('目录.png'), size: '1200x900', uploadedArtworkIncluded: Boolean(artwork) } };
+  const output = { version: 2, generatedBy: 'local-template', input: pack.input, titles: pack.titles, selectedTitle: $('#publishing-output-title').value, body: $('#publishing-output-body').value, textPrompt: pack.textPrompt, imagePrompt: pack.imagePrompt, theme: $('#publishing-theme').value, warnings: pack.warnings, graphics: graphicsReady ? { cover: filename('封面.png'), keywords: filename('关键词.png'), size: '1200x900', uploadedArtworkIncluded: Boolean(artwork) } : null };
   downloadBlob(new Blob([JSON.stringify(output, null, 2)], { type: 'application/json;charset=utf-8' }), filename('素材清单.json'));
 });
 for (const kind of ['cover', 'directory']) $(`#publishing-download-${kind}`).addEventListener('click', () => {
-  const name = filename(kind === 'cover' ? '封面.png' : '目录.png');
+  const name = filename(kind === 'cover' ? '封面.png' : '关键词.png');
   $(`#publishing-${kind}`).toBlob((blob) => {
     if (blob) downloadBlob(blob, name);
     else message('图片下载准备失败，请重新生成。');
@@ -221,6 +230,7 @@ for (const kind of ['cover', 'directory']) $(`#publishing-download-${kind}`).add
 $('#publishing-copy-text-prompt').addEventListener('click', () => copyText($('#publishing-text-prompt').value));
 $('#publishing-copy-image-prompt').addEventListener('click', () => copyText($('#publishing-image-prompt').value));
 $('#publishing-theme').addEventListener('change', renderGraphics);
+$('#publishing-optional-images').addEventListener('toggle', () => { if ($('#publishing-optional-images').open) void renderGraphics(); });
 $('#publishing-clear-artwork').addEventListener('click', async () => {
   artworkSequence += 1;
   artwork = null;
@@ -264,11 +274,11 @@ $('#publishing-load').addEventListener('click', async () => {
     const saved = localStorage.getItem(storageKey);
     if (!saved) return message('当前浏览器还没有保存过草稿。');
     const state = JSON.parse(saved);
-    if (state.version !== 1 || !state.input || typeof state.input !== 'object') throw new Error('invalid-draft');
+    if (![1, 2].includes(state.version) || !state.input || typeof state.input !== 'object') throw new Error('invalid-draft');
     sessionDrafts.set(activeKey, { state: snapshot(), artwork });
     activeKey = 'saved';
     await restore(state);
-    message('已恢复本机草稿。若此前上传过图片，请重新选择图片。');
+    message(stale ? '已保留旧版草稿内容，请重新生成以使用带码链接和关键词文案。' : '已恢复本机草稿。若此前上传过图片，请重新选择图片。');
   } catch { message('草稿无法恢复，请重新填写或使用已下载的素材。'); }
 });
 updateActions();

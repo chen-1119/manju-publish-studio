@@ -74,26 +74,15 @@ function ownShare(value, sourceUrl) {
 }
 
 function publishingResult(job) {
-  const included = [];
-  let length = 0;
-  for (const file of job.files) {
-    const next = Array.from(file.name.trim()).length + (included.length ? 1 : 0);
-    if (length + next > 1200) break;
-    included.push(file.name.trim());
-    length += next;
-  }
-  if (!included.length) throw new PipelineError('本次文件名称过长，请在网盘核对后手工整理发布目录', 409);
   const input = {
     title: job.input.resource.title,
     mode: 'works', synopsis: '', genre: '', episodes: '', completion: 'unknown',
-    resources: included.join('\n'),
     ownShareUrl: job.ownShare.url,
     ownAccessCode: job.ownShare.accessCode,
     targetBar: job.input.targetBar,
     tone: 'clear',
   };
   const pack = generatePublishingPack(input);
-  if (included.length < job.files.length) pack.warnings.push(`本次共保存 ${job.files.length} 项，发布目录展示前 ${included.length} 项；完整文件请查看自己的网盘分享。`);
   return { input: pack.input, pack };
 }
 

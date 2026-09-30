@@ -38,8 +38,10 @@ test('runs transfer, own share, generation in order using actual saved files and
   assert.deepEqual(calls, ['save', 'share']);
   assert.equal(result.result.input.title, '测试作品');
   assert.equal(result.result.input.synopsis, '');
-  assert.equal(result.result.input.resources, '第01集.mp4\n第02集.mp4');
-  assert.equal(result.result.input.ownShareUrl, own().url);
+  assert.equal(result.result.input.keywords, 'AI漫剧、作品资源、百度网盘');
+  assert.ok(!('resources' in result.result.input));
+  assert.ok(!result.result.pack.body.includes('第01集.mp4'));
+  assert.equal(result.result.input.ownShareUrl, `${own().url}?pwd=wxyz`);
   assert.equal(result.result.input.ownAccessCode, 'wxyz');
   assert.equal(result.result.input.targetBar, 'AI漫剧吧');
   assert.equal(result.result.input.completion, 'unknown');
@@ -191,7 +193,7 @@ test('state checkpoints restore completed task without redoing transfer or own s
   const duplicate = await restored.start(input());
   assert.equal(duplicate.id, job.id);
   assert.equal(duplicate.status, 'completed');
-  assert.equal(duplicate.result.input.ownShareUrl, own().url);
+  assert.equal(duplicate.result.input.ownShareUrl, `${own().url}?pwd=wxyz`);
   await restored.retry(job.id);
 });
 
