@@ -51,12 +51,14 @@ function showReference() {
   }
 }
 
-function populatePack(generated, edited = null) {
+function populatePack(generated, edited = null, syncInput = true) {
   pack = generated;
   stale = false;
-  form.elements.ownShareUrl.value = generated.input.ownShareUrl;
-  form.elements.ownAccessCode.value = generated.input.ownAccessCode;
-  form.elements.keywords.value = generated.input.keywords;
+  if (syncInput) {
+    form.elements.ownShareUrl.value = generated.input.ownShareUrl;
+    form.elements.ownAccessCode.value = generated.input.ownAccessCode;
+    form.elements.keywords.value = generated.input.keywords;
+  }
   $('#publishing-empty').hidden = true;
   $('#publishing-pack').hidden = false;
   $('#publishing-output-title').value = typeof edited?.title === 'string' ? edited.title.slice(0, 160) : generated.titles[0];
@@ -128,7 +130,7 @@ async function restore(state, selectedArtwork = null) {
     try {
       const generated = generatePublishingPack(state.pack.input || state.input);
       if (state.version === 2 && Array.isArray(state.pack.warnings)) generated.warnings = state.pack.warnings.filter((value) => typeof value === 'string').slice(0, 10).map((value) => value.slice(0, 500));
-      populatePack(generated, state.pack);
+      populatePack(generated, state.pack, false);
       stale = Boolean(state.stale) || !state.pack.input?.keywords;
       await renderGraphics();
     } catch { message('草稿资料尚未完整，请补充后生成。'); }
@@ -177,7 +179,7 @@ document.addEventListener('publishing:ready', async (event) => {
       url: job.input?.resource?.shareUrl || '' }, version: 2, pack: { input, warnings: job.result.pack?.warnings } });
   }
   openEditor();
-  message('自动流程已完成：带提取码的分享链接与关键词文案已就绪，可修改、复制或下载。图片可按需添加。');
+  message(stale ? '已恢复此资源的编辑内容，请重新生成以应用修改。图片为可选项。' : '自动流程已完成：带提取码的分享链接与关键词文案已就绪，可修改、复制或下载。图片可按需添加。');
 });
 
 form.addEventListener('submit', async (event) => {
